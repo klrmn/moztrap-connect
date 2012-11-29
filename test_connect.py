@@ -9,7 +9,6 @@ from mtconnect.connect import ProductVersionDoesNotExistException
 
 class TestConnect:
 
-
     # constructor
     def test_connect_limits(self, testmoztrap):
         unlimited = testmoztrap.connect.get_products()
@@ -124,7 +123,7 @@ class TestConnect:
         assert "Either run_id or productversion_id or product and "
         "version are required." in e.exconly()
 
-
+    @pytest.mark.xfail(reason="productversion_id -> productversion_name")
     def test_get_runs_filter_by_productversion_id(self, testmoztrap):
         runs = testmoztrap.connect.get_runs(productversion_id=31)
         print "runs:\n%s" % runs
