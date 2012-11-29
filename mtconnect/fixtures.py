@@ -14,161 +14,65 @@ class _Fixture(object):
                     arg, cls, method))
 
 
-    def __init__(self, connect, _data=None, **kwargs):
+    def __init__(self, connect, fields={}, _data=None):
         '''Instance constructor. Use the API to create a object.
 
         ::Args::
         connect - an mtconnect.connect.Connect object
+        fields - a dictionary of field names and values
 
-        ::Keyword Args::
+        Also used internally to create Fixtures out of data from list methods.
         '''
-        self._verify_args(kwargs, self._create_args, '__init__')
+        self.connect = connect
         if _data:
             # create object for existing record
             self.__dict__.update(_data)
         else:
-            # XXX do API create
-            self.__dict__.update(kwargs)
+            self._verify_args(fields, self._create_args, '__init__')
+            print connect.do_post(self._uri, fields)
+            # TODO update self with result of do_post, once it's not outputting an error
+            # REPLACES NEXT LINE
+            prods = ProductFixture.list(connect, name=fields['name'])
+            self.__dict__.update(prods[0].__dict__)
 
-    def edit(self, **kwargs):
+    def get(self):
+        '''Instance method. Refresh the object with data from the server.'''
+        r = self.connect.do_get(self._uri, self.id)
+        data = loads(r.text)
+        print data
+        self.__dict__.update(data)
+
+    def edit(self, fields):
         '''Instance method. Use the API to edit the object.
 
-        ::Keyword Args::
+        ::Args::
+        fields - dictionary of field names and values
+
         '''
-        self._verify_args(kwargs, _edit_args, 'edit')
+        print self.__dict__
+        self._verify_args(fields, self._edit_args, 'edit')
+        self.connect.do_put(self._uri, self.id, fields)
+        self.__dict__.update(fields)
 
     def delete(self):
         '''Instance method. Use the API to delete the object.'''
-        pass
+        self.connect.do_delete(self._uri, self.id)
 
     @classmethod
-    def list(connect):
+    def list(cls, connect, **filters):
         '''Class method. Query the API for existing object.
 
         ::Args::
         connect - an mtconnect.connect.Connect object.
 
-        ::Returns::
-        A list of _Fixture objects will be returned.
-        '''
-
-    @classmethod
-    def find(connect, **filters):
-        '''Class method. Query the API for a specific existing project.
-
-        ::Args::
-        connect - an mtconnect.connect.Connect object
-
         ::Keyword Args (filters)::
 
         ::Returns::
-        A single _Fixture or None will be returned.
-        '''
-        self._verify_args(filters, _filter_args, 'edit')
-
-class ProductFixture(_Fixture):
-    _uri = '/manage/product/add/'
-    _edit_args = ['id_description', 'id_profile']
-    _create_args = _edit_args + ['id_name', 'id_version']
-    _filter_args = ['name', 'id']
-
-    @classmethod
-    def create(cls, connect, data):
-        cls._verify_args(data, cls._create_args, 'create')
-        return connect.do_post(cls._uri, data)
-
-    @classmethod
-    def list(cls, connect):
-        r = connect.do_get("product")
-        products = loads(r.text)["objects"]
-        return [cls(connect, _data=prod) for prod in products]
-
-    @classmethod
-    def find(cls, connect, **filters):
-        '''Class method. Query the API for a specific existing project.
-
-        ::Args::
-        connect - an mtconnect.connect.Connect object
-
-        ::Keyword Args (filters)::
-        name - name of project
-        id - id of project
-
-        ::Returns::
-        A single ProductFixture or None will be returned.
+        A potentially empty list of _Fixture objects will be returned.
         '''
         cls._verify_args(filters, cls._filter_args, 'find')
 
-        eyedee = str(filters.pop('id', None))
+        r = connect.do_get(cls._uri, params=filters)
+        objects = loads(r.text)["objects"]
 
-        r = connect.do_get("product", params=filters)
-        products = loads(r.text)["objects"]
-
-        if len(products) == 1:
-            return cls(connect, _data=products[0].items())
-        if eyedee:
-            for product in products:
-                if product['id'] == eyedee:
-                    return cls(connect, _data=product.items())
-        
-        return None
-
-
-# class ProjectVersionFixture(_Fixture):
-#     _edit_args = []
-#     _create_args = [_edit_args, ]
-#     _filter_args = []
-
-#     @classmethod
-#     def list(cls, connect, ):
-#         r = connect.do_get("product")
-#         products = loads(r.text)["objects"]
-#         return [cls(connect, _data=prod) for prod in products]
-
-#     @classmethod
-#     def find(cls, connect, **filters):
-#         '''Class method. Query the API for a specific existing project.
-
-#         ::Args::
-#         connect - an mtconnect.connect.Connect object
-
-#         ::Keyword Args (filters)::
-#         name - name of project
-#         id - id of project
-
-#         ::Returns::
-#         A single ProductFixture or None will be returned.
-#         '''
-#         cls._verify_args(filters, cls._filter_args, 'find')
-
-#         eyedee = str(filters.pop('id', None))
-
-#         r = connect.do_get("product", params=filters)
-#         products = loads(r.text)["objects"]
-
-#         if len(products) == 1:
-#             return cls(connect, _data=products[0].items())
-#         if eyedee:
-#             for product in products:
-#                 if product['id'] == eyedee:
-#                     return cls(connect, _data=product.items())
-        
-#         return None
-
-
-# class SuiteFixture(_Fixture):
-#     _edit_args = []
-#     _create_args = [_edit_args, ]
-#     _filter_args = []
-
-
-# class CaseFixture(_Fixture):
-#     _edit_args = []
-#     _create_args = [_edit_args, ]
-#     _filter_args = []
-
-
-# class RunFixture(_Fixture):
-#     _edit_args = []
-#     _create_args = [_edit_args, ]
-#     _filter_args = []
+        return [cls(connect, _data=obj) for obj in objects]
