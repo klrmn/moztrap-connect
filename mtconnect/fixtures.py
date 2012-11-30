@@ -1,4 +1,5 @@
 from json import loads
+import requests
 
 class _Fixture(object):
 
@@ -11,8 +12,7 @@ class _Fixture(object):
         for arg in actual_args.keys():
             if not arg in allowed_args:
                 raise Exception("%s not an allowed arguement for %s.%s." % (
-                    arg, cls, method))
-
+                    arg, cls.__name__, method))
 
     def __init__(self, connect, fields={}, _data=None):
         '''Instance constructor. Use the API to create a object.
@@ -23,23 +23,21 @@ class _Fixture(object):
 
         Also used internally to create Fixtures out of data from list methods.
         '''
+        cls = self.__class__
         self.connect = connect
         if _data:
             # create object for existing record
             self.__dict__.update(_data)
         else:
             self._verify_args(fields, self._create_args, '__init__')
-            print connect.do_post(self._uri, fields)
-            # TODO update self with result of do_post, once it's not outputting an error
-            # REPLACES NEXT LINE
-            prods = ProductFixture.list(connect, name=fields['name'])
-            self.__dict__.update(prods[0].__dict__)
+            r = connect.do_post(self._uri, fields)
+            self.id = r.headers['location'].split('/')[-2]
+            self.get()
 
     def get(self):
         '''Instance method. Refresh the object with data from the server.'''
         r = self.connect.do_get(self._uri, self.id)
         data = loads(r.text)
-        print data
         self.__dict__.update(data)
 
     def edit(self, fields):
@@ -49,7 +47,6 @@ class _Fixture(object):
         fields - dictionary of field names and values
 
         '''
-        print self.__dict__
         self._verify_args(fields, self._edit_args, 'edit')
         self.connect.do_put(self._uri, self.id, fields)
         self.__dict__.update(fields)
@@ -76,3 +73,17 @@ class _Fixture(object):
         objects = loads(r.text)["objects"]
 
         return [cls(connect, _data=obj) for obj in objects]
+
+
+class ProductFixture(_Fixture):
+    _uri = 'product'
+    _edit_args = ['description']
+    _create_args = _edit_args + ['name', 'productversions']
+    _filter_args = ['name']
+
+
+class SuiteFixture(_Fixture):
+    _uri = 'suite'
+    _edit_args = ['description', 'status', 'name', 'product']
+    _create_args = _edit_args
+    _filter_args = ['name', 'product']
